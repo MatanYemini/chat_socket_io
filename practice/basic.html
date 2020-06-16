@@ -1,0 +1,11 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js"></script>
+<script>
+  const socket = io('http://localhost:5000');
+
+  socket.on('connect', (data) => {
+    socket.on('welcome', (message) => {
+      console.log(message);
+    });
+    socket.emit('message', { data: 'I am exciting' });
+  });
+</script>
