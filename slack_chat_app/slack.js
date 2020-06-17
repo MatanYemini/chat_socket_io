@@ -12,25 +12,51 @@ const io = socketio(expressServer, {
   serveClient: true,
 });
 
-namespaces.forEach((namespace) => {
-  io.of(namespace.endpoint).on('connection', (socket) => {
-    console.log(`${socket.id} has join ${namespace.endpoint}`);
+io.on('connection', (socket) => {
+  // build an array to send back with img and endpoint for each NS
+  let nsData = namespaces.map((ns) => {
+    return {
+      img: ns.img,
+      endpoint: ns.endpoint,
+    };
   });
+  // send namespace data back to the client, we need to use socket, NOT io, because we want it to go
+  // just to this client
+  socket.emit('nsList', nsData);
 });
 
-io.on('connection', (socket) => {
-  socket.emit('messageFromServer', { data: 'Welcome to our server' });
-  socket.on('messageToServer', (dataFromClient) => {
-    console.log(dataFromClient);
+namespaces.forEach((namespace) => {
+  io.of(namespace.endpoint).on('connection', (nsSocket) => {
+    console.log(`${nsSocket.id} has join ${namespace.endpoint}`);
+    // someone connected to our chatgroups namespace
+    nsSocket.emit('nsRoomLoad', namespaces[0].rooms);
+    nsSocket.on('joinRoom', (roomToJoin, usersNumberCallBack) => {
+      nsSocket.join(roomToJoin);
+      // A callback when someone is entered
+      //Deal with history
+      io.of('/wiki')
+        .in(roomToJoin)
+        .clients((error, clients) => {
+          console.log(clients);
+          usersNumberCallBack(clients.length);
+        });
+    });
+    nsSocket.on('newMessageToServer', (msg) => {
+      const fullMsg = {
+        text: msg.text,
+        time: Date.now(),
+        username: 'rbunch',
+        avatar: 'https://via.placeholder.com/30',
+      };
+      console.log(msg);
+      // Send the message to All the sockets that are in the room that this Socket is in.
+      // how we can find what rooms THIS socket is in?
+      // The user will be in the 2nd room in the object list (this first is the namespace)
+      // This is because the socket ALWAYS joins its own room on connection
+      const roomTitle = Object.keys(nsSocket.rooms);
+      io.of('/wiki').to(roomTitle).emit('messageToClients', fullMsg);
+    });
   });
-  socket.join('level1');
-  io.of('/')
-    .to('level1')
-    .emit('joined', `${socket.id} Have joined the level 1 room`);
-});
-io.of('/admin').on('connection', (socket) => {
-  console.log('Someone connected to admin namespace');
-  io.of('/admin').emit('welcome', 'Welcome to admin channel!');
 });
 
 // Socket IO server -> Namespaces (localhost:9000/[namespace]) -> Romms are inside the namespace
