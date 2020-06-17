@@ -2,6 +2,8 @@ const express = require('express');
 const socketio = require('socket.io');
 const app = express();
 
+let namespaces = require('./data/namespaces');
+
 app.use(express, express.static(__dirname + '/public'));
 
 const expressServer = app.listen(9000);
@@ -9,6 +11,13 @@ const io = socketio(expressServer, {
   path: '/socket.io',
   serveClient: true,
 });
+
+namespaces.forEach((namespace) => {
+  io.of(namespace.endpoint).on('connection', (socket) => {
+    console.log(`${socket.id} has join ${namespace.endpoint}`);
+  });
+});
+
 io.on('connection', (socket) => {
   socket.emit('messageFromServer', { data: 'Welcome to our server' });
   socket.on('messageToServer', (dataFromClient) => {
